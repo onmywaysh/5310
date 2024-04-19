@@ -171,5 +171,4 @@ for (i in 1:1){
 })
 print(results_list)
 write.csv(results_list, file = "van_output.csv", row.names = TRUE)
-write.csv(para, file = "van_para.csv", row.names = TRUE)
 ```
