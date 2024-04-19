@@ -1,0 +1,175 @@
+---
+title: '5310 final project code'
+output: html_document
+date: "2024-04-16"
+---
+
+```{r 1}
+#the code is used for analysis based on simulated data
+library(MASS)
+# The function used for generating simulated data by Weibull distribution
+simulate_data<-function(k,lambda,n) {
+  rweibull(n,shape=k,scale=lambda)
+}
+
+#Use MLE to estimate parameters of Weibull
+weibull_estimator<-function(data) {
+  fit<-fitdistr(data,densfun="weibull")
+  return(c(fit$estimate["shape"], fit$estimate["scale"]))
+}
+
+#Jackknife Estimation Function
+jackknife_estimation<-function(data,estimator) {
+  n<-length(data)
+  estimates<-matrix(nrow=n,ncol=2)
+  for (i in 1:n) {
+    estimates[i,]<-estimator(data[-i])
+  }
+  return(estimates)
+}
+
+#Bootstrap Estimation Function
+bootstrap_estimation<-function(data,estimator,re) {
+  estimates<-replicate(re,estimator(sample(data,replace = TRUE)))
+  estimates<-t(estimates)
+  return(estimates)
+}
+
+#Function to calculate relative bias, variance, and confidence Intervals
+calculate_matrics<-function(original_parameters,estimated_parameters) {
+  r_bias<-(mean(estimated_parameters)-original_parameters)/original_parameters*100
+  variance<-var(estimated_parameters)
+  ci<-quantile(estimated_parameters,probs=c(0.025, 0.975))
+  list(r_bias=r_bias,var=variance,ci=ci)
+}
+
+# Weibull Parameters
+shapes<-c(1.75,2.81)
+scales<-c(6.12,2.92)
+sample_sizes<-c(9000,500,200,100,50,10)
+re<-1000  # Number of bootstrap replicates
+
+# conduct the analysis
+para<-expand.grid(shape=shapes,scale=scales,n=sample_sizes)
+results_list<-list()
+
+suppressWarnings({
+for (i in 1:nrow(para)){
+   data<-rweibull(n=para[i,3],shape=para[i,1],scale=para[i,2]) #produce the simulated data
+   jackknife_est<-jackknife_estimation(data,weibull_estimator) #Jackknife estimate
+   bootstrap_est<-bootstrap_estimation(data,weibull_estimator,re) #Bootstrap Estimate
+
+   JK_shape_matrics<-calculate_matrics(para[i,1],jackknife_est[,1])  #JK shape 
+   JK_scale_matrics<-calculate_matrics(para[i,2],jackknife_est[,2])  #JK scale
+   
+   BS_shape_matrics<-calculate_matrics(para[i,1],bootstrap_est[,1])  #BS shape
+   BS_scale_matrics<-calculate_matrics(para[i,2],bootstrap_est[,2])  #BS scale
+   
+   results_list[[i]]<-c(
+     real_shape=para[i,1],
+     real_scale=para[i,2],
+     real_sample_size=para[i,3],
+     JK_shape_rbias=JK_shape_matrics$r_bias,
+     JK_shape_var=JK_shape_matrics$var,
+     JK_shape_ci_lower=JK_shape_matrics$ci[1],
+     JK_shape_ci_upper=JK_shape_matrics$ci[2],
+     JK_scale_rbias=JK_scale_matrics$r_bias,
+     JK_scale_var=JK_scale_matrics$var,
+     JK_scale_ci_lower=JK_scale_matrics$ci[1],
+     JK_scale_ci_upper=JK_scale_matrics$ci[2],
+     BS_shape_rbias=BS_shape_matrics$r_bias,
+     BS_shape_var=BS_shape_matrics$var,
+     BS_shape_ci_lower=BS_shape_matrics$ci[1],
+     BS_shape_ci_upper=BS_shape_matrics$ci[2],
+     BS_scale_rbias=BS_scale_matrics$r_bias,
+     BS_scale_var=BS_scale_matrics$var,
+     BS_scale_ci_lower=BS_scale_matrics$ci[1],
+     BS_scale_ci_upper=BS_scale_matrics$ci[2]
+   )
+}
+})
+print(results_list)
+write.csv(results_list, file = "output.csv", row.names = TRUE)
+write.csv(para, file = "para.csv", row.names = TRUE)
+```
+   
+   
+   
+```{r 2}
+#this code is used for analysis based on real observation wind speed data
+library(MASS)
+library(readr)
+#Use MLE to estimate parameters of Weibull
+weibull_estimator<-function(data) {
+  fit<-fitdistr(data,densfun="weibull")
+  return(c(fit$estimate["shape"], fit$estimate["scale"]))
+}
+#read the observation data
+aa<-read_csv("realdata2.csv")
+#fit the data with Weibull distribution
+zz<-weibull_estimator(aa$VANWS)
+print(zz)
+#draw the fitting curve
+hist(aa$VANWS, freq = FALSE, xlim = c(0, max(aa$VANWS)), main = "Weibull Fit", xlab = "Wind Speed (WS)", col = "lightblue", border = "darkblue")
+curve(dweibull(x, shape = zz["shape"], scale = zz["scale"]), add = TRUE, col = "red", lwd = 2)
+
+#Function to calculate variance and confidence Intervals
+calculate_matrics<-function(estimated_parameters) {
+  variance<-var(estimated_parameters)
+  ci<-quantile(estimated_parameters,probs=c(0.025, 0.975))
+  list(var=variance,ci=ci)
+}
+
+#Jackknife Estimation Function
+jackknife_estimation<-function(data,estimator) {
+  n<-length(data)
+  estimates<-matrix(nrow=n,ncol=2)
+  for (i in 1:n) {
+    estimates[i,]<-estimator(data[-i])
+  }
+  return(estimates)
+}
+
+#Bootstrap Estimation Function
+bootstrap_estimation<-function(data,estimator,re) {
+  estimates<-replicate(re,estimator(sample(data,replace = TRUE)))
+  estimates<-t(estimates)
+  return(estimates)
+}
+
+re<-1000  # Number of bootstrap replicates
+
+# Do the Bootstrap and Jackknife estimation for the data
+results_list<-list()
+
+suppressWarnings({
+for (i in 1:1){
+   jackknife_est<-jackknife_estimation(aa$VANWS,weibull_estimator) #Jackknife estimate
+   bootstrap_est<-bootstrap_estimation(aa$VANWS,weibull_estimator,re) #Bootstrap estimate
+
+   JK_shape_matrics<-calculate_matrics(jackknife_est[,1])  #JK shape
+   JK_scale_matrics<-calculate_matrics(jackknife_est[,2])  #JK scale
+   
+   BS_shape_matrics<-calculate_matrics(bootstrap_est[,1])  #BS shape
+   BS_scale_matrics<-calculate_matrics(bootstrap_est[,2])  #BS scale
+   
+   results_list[[i]]<-c(
+     JK_shape_var=JK_shape_matrics$var,
+     JK_shape_ci_lower=JK_shape_matrics$ci[1],
+     JK_shape_ci_upper=JK_shape_matrics$ci[2],
+     JK_scale_var=JK_scale_matrics$var,
+     JK_scale_ci_lower=JK_scale_matrics$ci[1],
+     JK_scale_ci_upper=JK_scale_matrics$ci[2],
+     BS_shape_var=BS_shape_matrics$var,
+     BS_shape_ci_lower=BS_shape_matrics$ci[1],
+     BS_shape_ci_upper=BS_shape_matrics$ci[2],
+     BS_scale_var=BS_scale_matrics$var,
+     BS_scale_ci_lower=BS_scale_matrics$ci[1],
+     BS_scale_ci_upper=BS_scale_matrics$ci[2]
+   )
+}
+})
+print(results_list)
+write.csv(results_list, file = "van_output.csv", row.names = TRUE)
+write.csv(para, file = "van_para.csv", row.names = TRUE)
+```
